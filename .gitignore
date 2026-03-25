@@ -1,0 +1,5 @@
+config.json
+.fanbook_token_cache.json
+*.csv
+__pycache__/
+*.pyc

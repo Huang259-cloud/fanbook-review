@@ -1,0 +1,5 @@
+{
+  "api_key": "填入你的阿里云 DashScope API Key（sk-xxxx 格式）",
+  "base_url": "https://coding.dashscope.aliyuncs.com/v1",
+  "model": "qwen-vl-max"
+}
