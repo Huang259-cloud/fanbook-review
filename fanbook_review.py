@@ -529,9 +529,29 @@ def check_rules(work: Dict[str, Any], screenshots: List[str], theme: Optional[st
 
 # ─── 主流程 ───────────────────────────────────────────────────────────────────
 
+def extract_task_id_from_url(url: str) -> Optional[int]:
+    """从 Fanbook 活动链接中提取 task ID。
+    支持 taskId=12345 查询参数，以及 /task/12345 路径形式。"""
+    from urllib.parse import urlparse, parse_qs
+    parsed = urlparse(url)
+    qs = parse_qs(parsed.query)
+    for key in ('taskId', 'task_id', 'task-id', 'id'):
+        if key in qs:
+            try:
+                return int(qs[key][0])
+            except (ValueError, IndexError):
+                pass
+    # 路径中最后一段纯数字
+    for seg in reversed(parsed.path.split('/')):
+        if seg.isdigit() and len(seg) >= 4:
+            return int(seg)
+    return None
+
+
 def main():
     p = argparse.ArgumentParser(description='Fanbook 花园审稿预审')
     p.add_argument('--task-id', type=int)
+    p.add_argument('--url', help='活动链接（自动提取活动ID）')
     p.add_argument('--list-tasks', action='store_true')
     p.add_argument('--theme', help='本期活动主题关键词，如"春日"')
     p.add_argument('--dry-run', action='store_true')
@@ -539,6 +559,15 @@ def main():
     p.add_argument('--output', help='CSV 输出路径')
     p.add_argument('--limit', type=int)
     args = p.parse_args()
+
+    # 从 --url 提取 task_id
+    if args.url and not args.task_id:
+        extracted = extract_task_id_from_url(args.url)
+        if not extracted:
+            print(f"❌ 无法从链接中提取活动ID: {args.url}", file=sys.stderr)
+            sys.exit(1)
+        args.task_id = extracted
+        print(f"🔗 从链接提取活动ID: {args.task_id}")
 
     print("🔑 获取 token...")
     token, guild = get_token()
@@ -549,7 +578,14 @@ def main():
         for t in api.list_tasks():
             print(f"  [{t['id']}] {t['taskTitle']}  ({t.get('startDatetime','')[:10]} ~ {t.get('endDatetime','')[:10]})")
         if args.list_tasks: return
-        task_id = int(input("\n请输入活动 ID: ").strip())
+        raw = input("\n请输入活动链接或活动ID: ").strip()
+        if raw.startswith('http'):
+            task_id = extract_task_id_from_url(raw)
+            if not task_id:
+                print(f"❌ 无法从链接中提取活动ID: {raw}", file=sys.stderr)
+                sys.exit(1)
+        else:
+            task_id = int(raw)
     else:
         task_id = args.task_id
 
